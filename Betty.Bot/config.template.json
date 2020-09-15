@@ -1,0 +1,12 @@
+{
+    // bot join link: https://discord.com/api/oauth2/authorize?client_id=000000000000000000&scope=bot&permissions=8 // 8 = administrator, 2048 = send messages
+    "DiscordToken": "",
+    "DefaultPrefix": "$",
+    "AzureStorageAccount": "UseDevelopmentStorage=true", // actual storage is preferred
+    "TwitchCallbackUrl": "https://myfunctionapp.azurewebsites.net/api/TwitchCallback?code=supersecretcode",
+    "TwitchCallbackSigningSecret": "", // configure same secret in Betty.FunctionApp configuration
+    "TwitchAuthBase": "https://id.twitch.tv",
+    "TwitchClientId": "", // Twitch client-id
+    "TwitchClientSecret": "", // Twitch client-secret
+    "ImgbbApiKey": "" // imgbb.com API key if enabled in program.cs, storage account is default now
+}
