@@ -33,6 +33,7 @@ namespace Betty.Bot.Modules.Twitch
     public class TwitchCommands : ModuleBase
     {
         private static readonly Random Random = new Random();
+        private static readonly string FallbackGameId = "509658"; // Just Chatting
 
         private readonly ILogger _logger;
         private readonly IConfiguration _config;
@@ -210,7 +211,11 @@ namespace Betty.Bot.Modules.Twitch
                 // Fetch the latest stream status
                 var streamResp = await _twitch.Helix.Streams.GetStreamsAsync(userIds: new List<string> { streamer.Id });
                 if (streamResp.Streams.Length == 0)
+                {
+                    // Seems this streamer went offline?
+                    await ProcessStreamMessage(streamer.Id, JsonConvert.SerializeObject(streamResp));
                     continue;
+                }
                 var stream = streamResp.Streams.First();
 
                 // Create a new thumbnail
@@ -308,7 +313,6 @@ namespace Betty.Bot.Modules.Twitch
 
                 return url;
             }
-
         }
 
         private async Task ProcessStreamMessage(string userid, string body)
@@ -331,13 +335,14 @@ namespace Betty.Bot.Modules.Twitch
             // Decide what to do depending on what we received and what our state is
             var streams = JsonConvert.DeserializeObject<GetStreamsResponse>(body);
             var stream = streams.Streams.FirstOrDefault();
+            var correctedGameId = string.IsNullOrEmpty(stream?.GameId) ? FallbackGameId : stream.GameId; // We cannot handle empty "game_id"
             
             if (!state.IsLive && stream != null) // User just went live
             {
                 // Get game information
-                var gameResp = await _twitch.Helix.Games.GetGamesAsync(gameIds: new List<string> { stream.GameId }).ConfigureAwait(true);
+                var gameResp = await _twitch.Helix.Games.GetGamesAsync(gameIds: new List<string> { correctedGameId }).ConfigureAwait(true);
                 if (gameResp.Games.Length == 0)
-                    throw new ApplicationException($"Cannot find a game with gameid: {stream.GameId}");
+                    throw new ApplicationException($"Cannot find a game with gameid: {correctedGameId}");
                 var game = gameResp.Games.First();
 
                 // Update fields
@@ -357,7 +362,7 @@ namespace Betty.Bot.Modules.Twitch
                 state.Snapshots.Add(new Snapshot
                 {
                     SnapshotTime = DateTime.UtcNow,
-                    GameId = stream.GameId,
+                    GameId = correctedGameId,
                     ThumbnailUrl = streamThumbnail,
                     Title = state.Description,
                     ViewerCount = stream.ViewerCount
@@ -376,9 +381,9 @@ namespace Betty.Bot.Modules.Twitch
             else if (state.IsLive && stream != null) // User is already live, but we received an update. Something probably changed.
             {
                 // Get game information
-                var gameResp = await _twitch.Helix.Games.GetGamesAsync(gameIds: new List<string> { stream.GameId }).ConfigureAwait(true);
+                var gameResp = await _twitch.Helix.Games.GetGamesAsync(gameIds: new List<string> { correctedGameId }).ConfigureAwait(true);
                 if (gameResp.Games.Length == 0)
-                    throw new ApplicationException($"Cannot find a game with gameid: {stream.GameId}");
+                    throw new ApplicationException($"Cannot find a game with gameid: {correctedGameId}");
                 var game = gameResp.Games.First();
 
                 // Update fields

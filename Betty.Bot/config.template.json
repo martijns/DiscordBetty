@@ -8,5 +8,6 @@
     "TwitchAuthBase": "https://id.twitch.tv",
     "TwitchClientId": "", // Twitch client-id
     "TwitchClientSecret": "", // Twitch client-secret
-    "ImgbbApiKey": "" // imgbb.com API key if enabled in program.cs, storage account is default now
+    "ImgbbApiKey": "", // imgbb.com API key if enabled in program.cs, storage account is default now,
+    "SentryDSN": "" // Sentry.io DSN, something like https://xxxx.ingest.sentry.io/xxxx
 }

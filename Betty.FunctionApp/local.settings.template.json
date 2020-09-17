@@ -3,6 +3,7 @@
     "Values": {
         "AzureWebJobsStorage": "UseDevelopmentStorage=true",
         "FUNCTIONS_WORKER_RUNTIME": "dotnet",
-        "TwitchCallbackSigningSecret": ""
+        "TwitchCallbackSigningSecret": "", // configure same secret in Betty.Bot configuration
+        "SENTRY_DSN": "" // Sentry.io DSN, something like https://xxxx.ingest.sentry.io/xxxx
     }
 }

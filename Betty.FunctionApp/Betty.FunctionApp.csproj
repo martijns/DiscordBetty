@@ -7,6 +7,8 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.Storage" Version="3.0.10" />
     <PackageReference Include="Microsoft.NET.Sdk.Functions" Version="3.0.3" />
+    <PackageReference Include="Sentry" Version="2.1.6" />
+    <PackageReference Include="Sentry.Extensions.Logging" Version="2.1.6" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Betty.Entities\Betty.Entities.csproj" />

@@ -19,6 +19,7 @@ using Betty.Bot.Extensions;
 using TwitchLib.Api;
 using Discord.API;
 using Azure.Storage.Blobs;
+using Sentry;
 
 namespace Betty.Bot
 {
@@ -36,18 +37,25 @@ namespace Betty.Bot
 
         public async Task MainAsync()
         {
-            // Setup logger
-            Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Debug()
-                .WriteTo.File("logs/betty.log", rollingInterval: RollingInterval.Day, outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
-                .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3} {SourceContext:l}] {Message:lj}{NewLine}{Exception}")
-                .CreateLogger();
-
-            // Setup builder
+            // Setup configuration
             var config = new ConfigurationBuilder()
                 .SetBasePath(AppContext.BaseDirectory)
                 .AddJsonFile(path: "config.json")
                 .Build();
+
+            // Setup logger
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.Sentry(o =>
+                {
+                    o.MinimumBreadcrumbLevel = Serilog.Events.LogEventLevel.Debug;
+                    o.MinimumEventLevel = Serilog.Events.LogEventLevel.Warning;
+                    o.Dsn = new Dsn(config["SentryDSN"]);
+                    o.InitializeSdk = true;
+                })
+                .WriteTo.File("logs/betty.log", rollingInterval: RollingInterval.Day, outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+                .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3} {SourceContext:l}] {Message:lj}{NewLine}{Exception}")
+                .CreateLogger();
 
             // Setup filesystemwatcher
             var fsw = new FileSystemWatcher(AppContext.BaseDirectory, "*.*");
@@ -58,6 +66,12 @@ namespace Betty.Bot
                 if (args.Name.ToLowerInvariant().EndsWith(".dll")
                     || args.Name.ToLowerInvariant().EndsWith(".exe"))
                 {
+                    if (args.Name.Contains("ffmpeg") || args.Name.Contains("ffprobe"))
+                    {
+                        Log.Warning($"File {args.Name} {args.ChangeType}, ignoring changes for ffmpeg binaries");
+                        return;
+                    }
+
                     Log.Warning($"File {args.Name} {args.ChangeType}, restarting app in 10 seconds");
                     await Task.Delay(10000);
                     _InterruptRequested = true;
@@ -112,7 +126,6 @@ namespace Betty.Bot
                 var client = serviceProvider.GetRequiredService<DiscordSocketClient>();
                 client.Ready += () =>
                 {
-                    PrecacheUsersAndTextChannels(client).Forget(ex => Log.Warning(ex, $"Error preloading users and text channels"));
                     return Task.CompletedTask;
                 };
                 client.JoinedGuild += async (guild) =>
@@ -135,19 +148,6 @@ namespace Betty.Bot
                 Log.Information($"Interrupt requested, shutting down");
                 Log.CloseAndFlush();
             }
-        }
-
-        private Task PrecacheUsersAndTextChannels(DiscordSocketClient client)
-        {
-            //foreach (var guild in client.Guilds)
-            //{
-            //    Log.Information($"{guild.Name} => GetTextChannelsAsync");
-            //    await ((IGuild)guild).GetTextChannelsAsync(CacheMode.AllowDownload);
-            //    Log.Information($"{guild.Name} => DownloadUsersAsync");
-            //    await guild.DownloadUsersAsync();
-            //    Log.Information($"{guild.Name} => Done");
-            //}
-            return Task.CompletedTask;
         }
     }
 }

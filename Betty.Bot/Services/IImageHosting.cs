@@ -171,6 +171,8 @@ namespace Betty.Bot.Services
                     return "video/webm";
                 case ".wav":
                     return "audio/wave";
+                case ".mp4":
+                    return "video/mp4";
                 default:
                     return "image/jpeg"; // we are working with images here so lets default back to an image. Even when wrong, the browser should adjust.
             }
