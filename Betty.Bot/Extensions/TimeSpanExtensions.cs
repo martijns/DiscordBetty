@@ -32,5 +32,31 @@ namespace Betty.Bot.Extensions
 
             return string.Join(", ", parts.Select(p => string.Format("{0} {1}{2}", p.Item2, p.Item1, p.Item2 > 1 || p.Item2 == 0 ? "s" : string.Empty)));
         }
+
+        private enum ShortTimeSpanElement
+        {
+            ms,
+            s,
+            m,
+            h,
+            d
+        }
+
+        public static string ToShortFriendlyDisplay(this TimeSpan timeSpan, int maxNrOfElements)
+        {
+            maxNrOfElements = Math.Max(Math.Min(maxNrOfElements, 5), 1);
+            var parts = new[]
+            {
+                Tuple.Create(ShortTimeSpanElement.d, timeSpan.Days),
+                Tuple.Create(ShortTimeSpanElement.h, timeSpan.Hours),
+                Tuple.Create(ShortTimeSpanElement.m, timeSpan.Minutes),
+                Tuple.Create(ShortTimeSpanElement.s, timeSpan.Seconds),
+                Tuple.Create(ShortTimeSpanElement.ms, timeSpan.Milliseconds)
+            }
+            .SkipWhile(i => i.Item2 <= 0)
+            .Take(maxNrOfElements);
+
+            return string.Join("", parts.Select(p => string.Format("{0}{1}", p.Item2, p.Item1)));
+        }
     }
 }

@@ -12,9 +12,11 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.OData.Edm.Vocabularies;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -353,6 +355,13 @@ namespace Betty.Bot.Modules.Twitch
                 state.CurrentTitle = stream.Title;
                 state.CurrentGameName = game.Name;
                 state.CurrentGameBoxArtUrl = game.BoxArtUrl;
+                state.Games = new List<GameEvent>();
+                state.Games.Add(new GameEvent { EventTime = stream.StartedAt, SecondsSinceLive = 0, GameId = game.Id, GameName = game.Name });
+
+                // Get link to VOD
+                var video = await _twitch.Helix.Videos.GetVideoAsync(userId: state.Id, type: VideoType.Archive, first: 1);
+                if (video.Videos.Length > 0 && DateTime.Parse(video.Videos.First().CreatedAt, CultureInfo.InvariantCulture) > DateTime.UtcNow.AddDays(-2))
+                    state.LinkToVOD = $"https://www.twitch.tv/videos/{video.Videos.First().Id}";
 
                 // Prepare current images
                 var streamThumbnail = await _imagehost.UploadImageFromUrl(state.ThumbnailTemplateUrl.Replace("{width}", "1280").Replace("{height}", "720") + $"?random={Random.Next(1000000, 9999999)}");
@@ -395,6 +404,20 @@ namespace Betty.Bot.Modules.Twitch
                 state.CurrentGameName = game.Name;
                 state.CurrentGameBoxArtUrl = game.BoxArtUrl;
 
+                // Get link to VOD
+                var video = await _twitch.Helix.Videos.GetVideoAsync(userId: state.Id, type: VideoType.Archive, first: 1);
+                if (video.Videos.Length > 0 && DateTime.Parse(video.Videos.First().CreatedAt, CultureInfo.InvariantCulture) > DateTime.UtcNow.AddDays(-2))
+                    state.LinkToVOD = $"https://www.twitch.tv/videos/{video.Videos.First().Id}";
+
+                // Maybe the game changed?
+                if (state.Games.LastOrDefault()?.GameId != game.Id)
+                {
+                    var secondsSinceLive = (long)(DateTime.UtcNow - state.WentLiveAt.Value).TotalSeconds;
+                    if (state.Games.Count > 0)
+                        state.Games.Last().DurationInSeconds = secondsSinceLive - state.Games.Last().SecondsSinceLive;
+                    state.Games.Add(new GameEvent { EventTime = DateTime.Now, SecondsSinceLive = secondsSinceLive, GameId = game.Id, GameName = game.Name });
+                }
+
                 // Update announcements
                 foreach (var announcement in state.Announcements)
                 {
@@ -421,6 +444,18 @@ namespace Betty.Bot.Modules.Twitch
                 // User was live, but went offline
                 state.IsLive = false;
                 state.WentOfflineAt = DateTime.UtcNow;
+
+                // Close the last game event
+                if (state.Games.Count > 0)
+                {
+                    var secondsSinceLive = (long)(DateTime.UtcNow - state.WentLiveAt.Value).TotalSeconds;
+                    state.Games.Last().DurationInSeconds = secondsSinceLive - state.Games.Last().SecondsSinceLive;
+                }
+
+                // Get link to VOD
+                var video = await _twitch.Helix.Videos.GetVideoAsync(userId: state.Id, type: VideoType.Archive, first: 1);
+                if (video.Videos.Length > 0 && DateTime.Parse(video.Videos.First().CreatedAt, CultureInfo.InvariantCulture) > DateTime.UtcNow.AddDays(-2))
+                    state.LinkToVOD = $"https://www.twitch.tv/videos/{video.Videos.First().Id}";
 
                 // Update announcements
                 foreach (var announcement in state.Announcements)
@@ -469,21 +504,38 @@ namespace Betty.Bot.Modules.Twitch
                 .Replace("{game}", stream.CurrentGameName)
                 .Replace("{link}", $"https://twitch.tv/{stream.UserName}");
 
-            string footerText;
-            DateTimeOffset timestamp;
-            if (stream.IsLive)
-            {
-                var timespan = DateTime.UtcNow - (stream.WentLiveAt ?? DateTime.UtcNow);
-                footerText = $"Streaming {timespan.ToFriendlyDisplay(2)}. Stream started at ⫸";
-                timestamp = stream.WentLiveAt ?? DateTime.UtcNow;
-            }
+            var description = new StringBuilder();
+            if (online)
+                description.Append($"**Status**\nOnline");
             else
+                description.Append($"**Status**\nOffline");
+
+            description.Append($"\n\n**Games**");
+            foreach (var game in stream.Games)
             {
-                var timespan = (stream.WentOfflineAt ?? DateTime.UtcNow) - (stream.WentLiveAt ?? DateTime.UtcNow);
-                footerText = $"Streamed for {timespan.ToFriendlyDisplay(2)}. Stream went offline at ⫸";
-                timestamp = stream.WentOfflineAt ?? DateTime.UtcNow;
+                var url = stream.LinkToVOD != null ? stream.LinkToVOD + $"?t={game.SecondsSinceLive}s" : null;
+                var label = game.DurationInSeconds.HasValue ? $" [`{new TimeSpan(0, 0, (int)game.DurationInSeconds).ToShortFriendlyDisplay(2)}`]({url})" : $" [`still streaming`]({url})";
+                description.Append($"\n{label} ⫸ __{game.GameName}__");
             }
 
+            if (stream.LinkToVOD != null)
+            {
+                description.Append($"\n\n**VOD**");
+                description.Append($"\n[Click here for the VOD]({stream.LinkToVOD}) or choose one of the timestamps above to go directly to that game.");
+            }
+
+            var footerText = "";
+            if (online && stream.WentLiveAt.HasValue)
+            {
+                var duration = (DateTime.UtcNow - stream.WentLiveAt.Value).ToFriendlyDisplay(2);
+                footerText = $"Streaming for {duration}";
+            }
+            if (!online && stream.WentLiveAt.HasValue && stream.WentOfflineAt.HasValue)
+            {
+                var duration = (stream.WentOfflineAt.Value - stream.WentLiveAt.Value).ToFriendlyDisplay(2);
+                footerText = $"Stream was live for {duration}";
+            }
+            
             var embed = new EmbedBuilder()
             {
                 Title = stream.CurrentTitle.Length >= EmbedBuilder.MaxTitleLength ? stream.CurrentTitle.Substring(0, 255) : stream.CurrentTitle,
@@ -497,16 +549,11 @@ namespace Betty.Bot.Modules.Twitch
                 Color = online ? Color.Green : Color.Red,
                 ThumbnailUrl = gameThumbnail,
                 ImageUrl = streamThumbnail,
-                Fields = new List<EmbedFieldBuilder>
-                {
-                    new EmbedFieldBuilder { Name = "Game", Value = stream.CurrentGameName },
-                    new EmbedFieldBuilder { Name = "Status", Value = online ? "Online" : "Offline" }
-                },
+                Description = description.ToString(),
                 Footer = new EmbedFooterBuilder
                 {
                     Text = footerText
-                },
-                Timestamp = timestamp
+                }
             }.Build();
 
             return Task.FromResult(new KeyValuePair<string, Embed>(announcementText, embed));
@@ -690,7 +737,13 @@ namespace Betty.Bot.Modules.Twitch
                     IsLive = true,
                     ViewCount = 420,
                     WentLiveAt = DateTime.UtcNow,
-                    WentOfflineAt = null
+                    WentOfflineAt = null,
+                    Games = new List<GameEvent>
+                    {
+                        new GameEvent { SecondsSinceLive = 0, EventTime = DateTime.UtcNow, GameId = "31376", GameName = "Terraria", DurationInSeconds = 1730 },
+                        new GameEvent { SecondsSinceLive = 1730, EventTime = DateTime.UtcNow, GameId = game.Id, GameName = game.Name }
+                    },
+                    LinkToVOD = "https://www.twitch.tv/videos/744916367"
                 };
             }
 
@@ -739,8 +792,14 @@ namespace Betty.Bot.Modules.Twitch
                     OfflineImageUrl = user.OfflineImageUrl,
                     IsLive = false,
                     ViewCount = 420,
-                    WentLiveAt = DateTime.UtcNow.AddHours(-1),
-                    WentOfflineAt = DateTime.UtcNow
+                    WentLiveAt = DateTime.UtcNow.AddHours(-1).AddMinutes(-10).AddSeconds(-13),
+                    WentOfflineAt = DateTime.UtcNow,
+                    Games = new List<GameEvent>
+                    {
+                        new GameEvent { SecondsSinceLive = 0, EventTime = DateTime.UtcNow, GameId = "31376", GameName = "Terraria", DurationInSeconds = 1730 },
+                        new GameEvent { SecondsSinceLive = 1730, EventTime = DateTime.UtcNow, GameId = game.Id, GameName = game.Name, DurationInSeconds = 615 }
+                    },
+                    LinkToVOD = "https://www.twitch.tv/videos/744916367"
                 };
             }
 
@@ -774,6 +833,8 @@ namespace Betty.Bot.Modules.Twitch
             public string CurrentGameName { get; set; }
             public string CurrentGameBoxArtUrl { get; set; }
             public List<Snapshot> Snapshots { get; set; } = new List<Snapshot>();
+            public List<GameEvent> Games { get; set; } = new List<GameEvent>();
+            public string LinkToVOD { get; set; }
         }
 
         public class Announcement
@@ -791,6 +852,24 @@ namespace Betty.Bot.Modules.Twitch
             public string Title { get; set; }
             public long ViewerCount { get; set; }
             public string ThumbnailUrl { get; set; }
+        }
+
+        /// <remarks>
+        /// Unfortunately, it's not legal to use the "GQL" (Graph Query Language?) endpoint:
+        ///     https://discuss.dev.twitch.tv/t/is-it-legal-to-use-https-gql-twitch-tv-gql-endpoint/21811/4
+        ///     Ex. url: POST https://gql.twitch.tv/gql with application/json
+        ///     Ex. req: [{"operationName":"VideoPlayer_ChapterSelectButtonVideo","variables":{"videoID":"744916367"},"extensions":{"persistedQuery":{"version":1,"sha256Hash":"b63c615e4fec1fbc3e6dd2d471c818886c4cf528c0cf99c136ba3981024f5e98"}}}]
+        ///     Ex. res: [{"data":{"video":{"id":"744916367","moments":{"edges":[{"node":{"moments":{"edges":[],"__typename":"VideoMomentConnection"},"id":"552eda2c6adfe60287a203628ce45a74","durationMilliseconds":8021000,"positionMilliseconds":0,"type":"GAME_CHANGE","description":"Ni no Kuni: Wrath of the White Witch","subDescription":"","thumbnailURL":"https://www.giantbomb.com/api/image/scale_avatar/2412937-box_nnk.png","details":{"game":{"id":"30014","displayName":"Ni no Kuni: Wrath of the White Witch","boxArtURL":"https://static-cdn.jtvnw.net/ttv-boxart/./Ni%20no%20Kuni:%20Wrath%20of%20the%20White%20Witch-40x53.jpg","__typename":"Game"},"__typename":"GameChangeMomentDetails","__typename":"GameChangeMomentDetails"},"video":{"id":"744916367","lengthSeconds":13886,"__typename":"Video"},"__typename":"VideoMoment","__typename":"VideoMoment"},"__typename":"VideoMomentEdge","__typename":"VideoMomentEdge"},{"node":{"moments":{"edges":[],"__typename":"VideoMomentConnection"},"id":"efd67779edf8cf6d0017634843dc9a2d","durationMilliseconds":5865000,"positionMilliseconds":8021000,"type":"GAME_CHANGE","description":"Music","subDescription":"","thumbnailURL":"https://giantbomb1.cbsistatic.com/uploads/scale_avatar/0/329/1255528-music_cover.jpg","details":{"game":{"id":"26936","displayName":"Music","boxArtURL":"https://static-cdn.jtvnw.net/ttv-boxart/Music-40x53.jpg","__typename":"Game"},"__typename":"GameChangeMomentDetails","__typename":"GameChangeMomentDetails"},"video":{"id":"744916367","lengthSeconds":13886,"__typename":"Video"},"__typename":"VideoMoment","__typename":"VideoMoment"},"__typename":"VideoMomentEdge","__typename":"VideoMomentEdge"}],"__typename":"VideoMomentConnection"},"__typename":"Video"}},"extensions":{"durationMilliseconds":67,"operationName":"VideoPlayer_ChapterSelectButtonVideo","requestID":"01EJKCQWQV8JPQKH83R9Y8QJD2"}}]
+        ///     
+        /// It would be much more accurate to use the "Chapters" as the website shows, but this is not exposed via the official API's. We'll have to keep our own list of game change events.
+        /// </remarks>
+        public class GameEvent
+        {
+            public DateTime EventTime { get; set; }
+            public long SecondsSinceLive { get; set; }
+            public long? DurationInSeconds { get; set; }
+            public string GameId { get; set; }
+            public string GameName { get; set; }
         }
     }
 }
