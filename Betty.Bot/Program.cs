@@ -58,21 +58,16 @@ namespace Betty.Bot
                 .CreateLogger();
 
             // Setup filesystemwatcher
-            var fsw = new FileSystemWatcher(AppContext.BaseDirectory, "*.*");
-            var pfw = new PhysicalFilesWatcher(AppContext.BaseDirectory, fsw, true);
-            Log.Information($"Watching {AppContext.BaseDirectory} for changes");
+            var baseDir = AppContext.BaseDirectory;
+            var fsw = new FileSystemWatcher(baseDir, "*.*");
+            var pfw = new PhysicalFilesWatcher(baseDir, fsw, true);
+            Log.Information($"Watching {baseDir} for changes...");
             static async void handler(object src, FileSystemEventArgs args)
             {
                 if (args.Name.ToLowerInvariant().EndsWith(".dll")
                     || args.Name.ToLowerInvariant().EndsWith(".exe"))
                 {
-                    if (args.Name.Contains("ffmpeg") || args.Name.Contains("ffprobe"))
-                    {
-                        Log.Warning($"File {args.Name} {args.ChangeType}, ignoring changes for ffmpeg binaries");
-                        return;
-                    }
-
-                    Log.Warning($"File {args.Name} {args.ChangeType}, restarting app in 10 seconds");
+                    Log.Information($"File {args.Name} {args.ChangeType}, restarting app in 10 seconds");
                     await Task.Delay(10000);
                     _InterruptRequested = true;
                 }
@@ -80,6 +75,7 @@ namespace Betty.Bot
             fsw.Changed += handler;
             fsw.Created += handler;
             fsw.Deleted += handler;
+            fsw.IncludeSubdirectories = false;
             fsw.EnableRaisingEvents = true;
 
             // Setup services
