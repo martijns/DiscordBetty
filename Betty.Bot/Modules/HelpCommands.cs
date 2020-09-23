@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 
 namespace Betty.Bot.Modules
 {
+    [Name("Help")]
     public class HelpModule : ModuleBase<SocketCommandContext>
     {
         private readonly CommandService _service;
@@ -30,12 +31,19 @@ namespace Betty.Bot.Modules
             var builder = new EmbedBuilder()
             {
                 Color = new Color(114, 137, 218),
-                Description = "These are the commands you can use:"
+                Description = "These are the commands you can use. Note that most commands can be used *without arguments*, the bot will ask for them, often providing examples or other details."
             };
 
             foreach (var module in _service.Modules)
             {
-                string description = null;
+                string description = string.Empty;
+
+                if (!string.IsNullOrEmpty(module.Summary))
+                {
+                    var summary = module.Summary.Replace("{prefix}", prefix);
+                    description += $"*{summary}*\n";
+                }
+
                 foreach (var cmd in module.Commands)
                 {
                     var result = await cmd.CheckPreconditionsAsync(Context);

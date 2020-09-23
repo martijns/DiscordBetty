@@ -26,6 +26,7 @@ using TwitchLib.Api.Helix.Models.Users;
 
 namespace Betty.Bot.Modules.Twitch
 {
+    [Name("Config")]
     public class ConfigCommands : ModuleBase
     {
         private static readonly Random Random = new Random();

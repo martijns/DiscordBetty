@@ -32,6 +32,8 @@ using TwitchLib.Api.Helix.Models.Users;
 
 namespace Betty.Bot.Modules.Twitch
 {
+    [Name("Twitch")]
+    [Summary("Configure announcements of Twitch streamers to a channel on your Discord server. The best way to get started is just to type **{prefix}twitch add**. The bot will ask everything it needs, and provide examples as you go.")]
     public class TwitchCommands : ModuleBase
     {
         private static readonly Random Random = new Random();
