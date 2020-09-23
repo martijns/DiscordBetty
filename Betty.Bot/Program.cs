@@ -126,7 +126,13 @@ namespace Betty.Bot
                 };
                 client.JoinedGuild += async (guild) =>
                 {
-                    await guild.DefaultChannel.SendMessageAsync($"Hi! I'm {client.CurrentUser.Mention}, your friendly neighborhood bot. To interact with me, use \"{client.CurrentUser.Mention} help\" or \"{await prefix.GetPrefix(guild)}help\". Don't worry if my prefix conflicts with another bot, you can change it to your liking!").ConfigureAwait(false);
+                    var channel = guild.SystemChannel ?? guild.DefaultChannel ?? guild.TextChannels.FirstOrDefault();
+                    if (channel == null)
+                    {
+                        Log.Information($"Guild {guild.Name} ({guild.Id}) has no text channels. Cannot send welcome message.");
+                        return;
+                    }
+                    await channel.SendMessageAsync($"Hi! I'm {client.CurrentUser.Mention}, your friendly neighborhood bot. To interact with me, use \"{client.CurrentUser.Mention} help\" or \"{await prefix.GetPrefix(guild)}help\". Don't worry if my prefix conflicts with another bot, you can change it to your liking!").ConfigureAwait(false);
                 };
                 await client.LoginAsync(Discord.TokenType.Bot, config["DiscordToken"]);
                 await client.StartAsync();
