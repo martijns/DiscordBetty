@@ -469,13 +469,27 @@ namespace Betty.Bot.Modules.Twitch
                     var message = await channel.GetMessageAsync(announcement.LastMessageId);
                     if (message is IUserMessage userMessage)
                     {
-                        var anigifUrl = await CreateAnimatedGif(state.Snapshots);
-                        var msg = await GetAnnouncement(guild, state, announcement.AnnouncementText, anigifUrl, online: false);
-                        await userMessage.ModifyAsync(props =>
+                        // Delete the message if the stream was shorter than 5 minutes
+                        if (state.WentLiveAt.HasValue && state.WentOfflineAt.HasValue
+                            && (state.WentOfflineAt.Value - state.WentLiveAt.Value).TotalSeconds < 300)
                         {
-                            props.Content = msg.Key;
-                            props.Embed = msg.Value;
-                        });
+                            var duration = (state.WentOfflineAt.Value - state.WentLiveAt.Value).ToShortFriendlyDisplay(2);
+                            await userMessage.ModifyAsync(props =>
+                            {
+                                props.Content = $"*Streamer **{state.DisplayName}** was online with **{state.CurrentGameName}** for less than 5 minutes ({duration}). To avoid spam, I've removed the message. Twitch API could simply be acting up.*";
+                                props.Embed = new EmbedBuilder().Build();
+                            });
+                        }
+                        else
+                        {
+                            var anigifUrl = await CreateAnimatedGif(state.Snapshots);
+                            var msg = await GetAnnouncement(guild, state, announcement.AnnouncementText, anigifUrl, online: false);
+                            await userMessage.ModifyAsync(props =>
+                            {
+                                props.Content = msg.Key;
+                                props.Embed = msg.Value;
+                            });
+                        }
                     }
                 }
             }
