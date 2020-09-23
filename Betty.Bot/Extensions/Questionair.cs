@@ -53,7 +53,7 @@ namespace Betty.Bot.Extensions
             while (true)
             {
                 _event.Reset();
-                var sentmsg = await _channel.SendMessageAsync($"{_prefix} {question}\n*(Use `cancel` to abort)*");
+                var sentmsg = await _channel.SendMessageAsync($"{_prefix} {question}\n*(Type `cancel` or wait {timeoutInSeconds} seconds to abort)*");
                 var start = DateTime.UtcNow;
                 while (!_event.WaitOne(1) && start.AddSeconds(timeoutInSeconds) > DateTime.UtcNow)
                     await Task.Delay(100);
