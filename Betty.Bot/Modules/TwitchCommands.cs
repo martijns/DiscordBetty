@@ -610,6 +610,9 @@ namespace Betty.Bot.Modules.Twitch
                 $"\n*{{link}} to reference the link to visit the channel*"
                 );
 
+            // Replace the @everyone with {everyone} so that a "twitch list" will not trigger a mention
+            message = message.Replace(Context.Guild.EveryoneRole.Mention, "{everyone}");
+
             var usersResp = await _twitch.Helix.Users.GetUsersAsync(logins: new List<string>{ username });
             if (usersResp.Users.Length == 0)
             {
