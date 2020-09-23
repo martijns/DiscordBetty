@@ -61,6 +61,11 @@ namespace Betty.Bot.Modules
         [Command("help")]
         public async Task HelpAsync([Remainder] string command)
         {
+            string prefix = await _prefix.GetPrefix(Context.Guild);
+
+            if (command.StartsWith(prefix))
+                command = command.Substring(prefix.Length);
+
             var result = _service.Search(Context, command);
 
             if (!result.IsSuccess)
@@ -69,7 +74,6 @@ namespace Betty.Bot.Modules
                 return;
             }
 
-            string prefix = await _prefix.GetPrefix(Context.Guild);
             var builder = new EmbedBuilder()
             {
                 Color = new Color(114, 137, 218),
