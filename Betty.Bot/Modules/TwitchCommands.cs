@@ -443,6 +443,15 @@ namespace Betty.Bot.Modules.Twitch
             }
             else if (state.IsLive && stream == null)
             {
+                // Ignore offline messages in the first 5 minutes. For some reason Twitch sends an filled stream object, then 30 seconds later it indicates the stream is offline, then 30 seconds later it sends a filled stream object again.
+                // If the stream actually went offline, the 'snapshot' feature will trigger an offline message again around the 5 minute mark.
+                if (state.WentLiveAt.HasValue && (DateTime.UtcNow - state.WentLiveAt.Value).TotalSeconds < 240)
+                {
+                    var duration = DateTime.UtcNow - state.WentLiveAt.Value;
+                    _logger.LogInformation($"Received an offline message for a stream that went online only {duration.ToShortFriendlyDisplay(2)} ago, ignoring it for now.");
+                    return;
+                }
+
                 // User was live, but went offline
                 state.IsLive = false;
                 state.WentOfflineAt = DateTime.UtcNow;
@@ -471,27 +480,13 @@ namespace Betty.Bot.Modules.Twitch
                     var message = await channel.GetMessageAsync(announcement.LastMessageId);
                     if (message is IUserMessage userMessage)
                     {
-                        // Delete the message if the stream was shorter than 5 minutes
-                        if (state.WentLiveAt.HasValue && state.WentOfflineAt.HasValue
-                            && (state.WentOfflineAt.Value - state.WentLiveAt.Value).TotalSeconds < 300)
+                        var anigifUrl = await CreateAnimatedGif(state.Snapshots);
+                        var msg = await GetAnnouncement(guild, state, announcement.AnnouncementText, anigifUrl, online: false);
+                        await userMessage.ModifyAsync(props =>
                         {
-                            var duration = (state.WentOfflineAt.Value - state.WentLiveAt.Value).ToShortFriendlyDisplay(2);
-                            await userMessage.ModifyAsync(props =>
-                            {
-                                props.Content = $"*Streamer **{state.DisplayName}** was online with **{state.CurrentGameName}** for less than 5 minutes ({duration}). To avoid spam, I've removed the message. Twitch API could simply be acting up.*";
-                                props.Embed = new EmbedBuilder().Build();
-                            });
-                        }
-                        else
-                        {
-                            var anigifUrl = await CreateAnimatedGif(state.Snapshots);
-                            var msg = await GetAnnouncement(guild, state, announcement.AnnouncementText, anigifUrl, online: false);
-                            await userMessage.ModifyAsync(props =>
-                            {
-                                props.Content = msg.Key;
-                                props.Embed = msg.Value;
-                            });
-                        }
+                            props.Content = msg.Key;
+                            props.Embed = msg.Value;
+                        });
                     }
                 }
             }
