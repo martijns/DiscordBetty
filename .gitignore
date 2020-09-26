@@ -362,3 +362,4 @@ MigrationBackup/
 FodyWeavers.xsd
 /Betty.Bot/config.json
 /Betty.FunctionApp/local.settings.json
+/Betty.Bot/gitlog.txt

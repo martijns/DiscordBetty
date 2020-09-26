@@ -4,7 +4,9 @@ using Discord.Commands;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -102,6 +104,13 @@ namespace Betty.Bot.Modules
             }
 
             await ReplyAsync("", false, builder.Build());
+        }
+
+        [Command("changelog")]
+        public async Task ChangelogAsync()
+        {
+            var changelog = await new StreamReader(Assembly.GetExecutingAssembly().GetManifestResourceStream("Betty.Bot.gitlog.txt")).ReadToEndAsync();
+            await ReplyAsync($"A bit technical, but here's the recent list of changes: ```{changelog}```");
         }
     }
 }

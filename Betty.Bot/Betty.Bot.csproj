@@ -11,6 +11,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="gitlog.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="gitlog.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Azure.Storage.Blobs" Version="12.5.1" />
     <PackageReference Include="Azure.Storage.Queues" Version="12.3.2" />
     <PackageReference Include="Discord.Net" Version="2.2.0" />
@@ -44,5 +52,9 @@
   </ItemGroup>
 
   <ProjectExtensions><VisualStudio><UserProperties config_1json__JsonSchema="" /></VisualStudio></ProjectExtensions>
+
+  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+    <Exec Command="git log --pretty=format:&quot;[%25%25h] %25%25an@%25%25ad: %25%25s&quot; --date=short -n10 &gt;gitlog.txt" />
+  </Target>
 
 </Project>
