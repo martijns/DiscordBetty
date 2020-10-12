@@ -525,11 +525,13 @@ namespace Betty.Bot.Modules.Twitch
             foreach (var game in stream.Games)
             {
                 var url = stream.LinkToVOD != null ? stream.LinkToVOD + $"?t={game.SecondsSinceLive}s" : null;
-                var label = game.DurationInSeconds.HasValue ? $" [`{new TimeSpan(0, 0, (int)game.DurationInSeconds).ToShortFriendlyDisplay(2)}`]({url})" : $" [`still streaming`]({url})";
+                var label = game.DurationInSeconds.HasValue ?
+                    $" [`{new TimeSpan(0, 0, (int)game.DurationInSeconds).ToShortFriendlyDisplay(2)}`]({url})" :
+                    $" [`still streaming`](https://twitch.tv/{stream.UserName})";
                 description.Append($"\n{label} ⫸ __{game.GameName}__");
             }
 
-            if (stream.LinkToVOD != null)
+            if (stream.LinkToVOD != null && !online)
             {
                 description.Append($"\n\n**VOD**");
                 description.Append($"\n[Click here for the VOD]({stream.LinkToVOD}) or choose one of the timestamps above to go directly to that game.");
