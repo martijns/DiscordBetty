@@ -38,6 +38,7 @@ namespace Betty.Bot.Modules.Twitch
     {
         private static readonly Random Random = new Random();
         private static readonly string FallbackGameId = "509658"; // Just Chatting
+        private static readonly int MaxSnapshots = 50; // Maximum number of snapshots (over 4 hours with 5 min interval)
 
         private readonly ILogger _logger;
         private readonly IConfiguration _config;
@@ -234,6 +235,15 @@ namespace Betty.Bot.Modules.Twitch
                     Title = stream.Title,
                     ViewerCount = stream.ViewerCount
                 });
+
+                // If we have too many snapshots, clear from the start. If we don't do this, we'll reach the 64kb limited storage in the KeyValueStore (when using azure storage).
+                while (streamer.Snapshots.Count > MaxSnapshots)
+                {
+                    _logger.LogDebug($"Removed the earliest snapshot we have since we reached the limit of 100 to keep.");
+                    streamer.Snapshots.RemoveAt(0);
+                }
+
+                // Save
                 await _kvstore.SetValueAsync("twitch", streamer.Id, streamer);
 
                 // Update announcements
@@ -495,6 +505,10 @@ namespace Betty.Bot.Modules.Twitch
                 // User was already offline and we got another message confirming this?
                 // We don't handle this for now
             }
+
+            // Temporary fix in case there are more than 50 snapshots. With a long stream title, this would cause issues. Eventually the IKeyValueStore implementation should simply support long values and solve it internally.
+            while (state.Snapshots.Count > MaxSnapshots)
+                state.Snapshots.RemoveAt(0);
 
             // Store the new state
             await _kvstore.SetValueAsync("twitch", state.Id, state);
