@@ -574,8 +574,8 @@ namespace Betty.Bot.Modules.Twitch
                 },
                 Url = $"https://twitch.tv/{stream.UserName}",
                 Color = online ? Color.Green : Color.Red,
-                ThumbnailUrl = gameThumbnail,
-                ImageUrl = streamThumbnail,
+                ThumbnailUrl = Uri.IsWellFormedUriString(gameThumbnail, UriKind.Absolute) ? gameThumbnail : null,
+                ImageUrl = Uri.IsWellFormedUriString(streamThumbnail, UriKind.Absolute) ? streamThumbnail : null,
                 Description = description.ToString(),
                 Footer = new EmbedFooterBuilder
                 {
