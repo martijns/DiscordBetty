@@ -12,6 +12,7 @@ using Betty.Entities.Twitch;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using Newtonsoft.Json.Linq;
 
 namespace Betty.FunctionApp
 {
@@ -25,15 +26,17 @@ namespace Betty.FunctionApp
         {
             log.LogInformation("TwitchCallback function called");
 
+            log.LogInformation($"Request headers: {JsonConvert.SerializeObject(req.Headers)}");
             log.LogInformation($"Request query: {req.QueryString}");
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             log.LogInformation($"Request body: {requestBody}");
+            var jobj = JsonConvert.DeserializeObject<JObject>(requestBody);
 
             // If this is a challenge, acknowledge
-            if (req.Query.ContainsKey("hub.challenge"))
+            if (jobj.ContainsKey("challenge"))
             {
-                string challenge = req.Query["hub.challenge"];
-                log.LogInformation($"Received a challenge, replying with {challenge}");
+                string challenge = jobj["challenge"].Value<string>();
+                log.LogInformation($"Received a challenge, replying with '{challenge}'");
                 return new ContentResult
                 {
                     StatusCode = 200,
@@ -42,12 +45,12 @@ namespace Betty.FunctionApp
                 };
             }
 
-            // Validate the signature (log for now)
+            // Validate the signature
             var signingSecret = Environment.GetEnvironmentVariable("TwitchCallbackSigningSecret");
             if (!string.IsNullOrEmpty(signingSecret))
             {
-                // We're expecting anything we get to be signed
-                var signature = req.Headers["X-Hub-Signature"].FirstOrDefault();
+                // We're expecting anything we get to be signed (https://dev.twitch.tv/docs/eventsub#verify-a-signature)
+                var signature = req.Headers["Twitch-Eventsub-Message-Signature"].FirstOrDefault();
                 if (string.IsNullOrEmpty(signature))
                     throw new ApplicationException($"The received message does not contain a signature. We won't accept its contents.");
                 var hashType = signature.Split("=")[0];
@@ -55,7 +58,9 @@ namespace Betty.FunctionApp
                     throw new ApplicationException($"The received hashtype ({hashType}) does not match what we expected (sha256). We cannot verify the contents.");
                 var receivedHash = signature.Split("=")[1];
                 using var sha256hmac = new HMACSHA256(Encoding.UTF8.GetBytes(signingSecret));
-                var hash = sha256hmac.ComputeHash(Encoding.UTF8.GetBytes(requestBody));
+                var twitchMessageId = req.Headers["Twitch-Eventsub-Message-Id"].FirstOrDefault();
+                var twitchMessageTimestamp = req.Headers["Twitch-Eventsub-Message-Timestamp"].FirstOrDefault();
+                var hash = sha256hmac.ComputeHash(Encoding.UTF8.GetBytes($"{twitchMessageId}{twitchMessageTimestamp}{requestBody}"));
                 var calculatedHash = BitConverter.ToString(hash).Replace("-", "").ToLower();
                 if (calculatedHash != receivedHash)
                     throw new ApplicationException($"The received hash ({receivedHash}) does not match the calculated hash ({calculatedHash}). We won't accept this message.");

@@ -1,5 +1,4 @@
-﻿using Azure.Core.Pipeline;
-using Azure.Storage.Queues;
+﻿using Azure.Storage.Queues;
 using Betty.Bot.Extensions;
 using Betty.Bot.Services;
 using Betty.Entities.Twitch;
@@ -8,11 +7,8 @@ using Discord.Commands;
 using Discord.Commands.Builders;
 using Discord.WebSocket;
 using ImageMagick;
-using Microsoft.AspNetCore.Http.Features;
-using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Microsoft.OData.Edm.Vocabularies;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -21,14 +17,9 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using TwitchLib.Api;
 using TwitchLib.Api.Core.Enums;
-using TwitchLib.Api.Helix.Models.Games;
-using TwitchLib.Api.Helix.Models.Streams;
-using TwitchLib.Api.Helix.Models.Subscriptions;
-using TwitchLib.Api.Helix.Models.Users;
 
 namespace Betty.Bot.Modules.Twitch
 {
@@ -92,13 +83,13 @@ namespace Betty.Bot.Modules.Twitch
                         var json = Encoding.UTF8.GetString(Convert.FromBase64String(message.MessageText));
                         _logger.LogDebug($"Processing twitch message: {json}");
                         var msg = JsonConvert.DeserializeObject<HttpCallbackMessage>(json);
-                        var userid = msg.QueryItems["user_id"];
-                        var username = msg.QueryItems["user_name"];
-                        var cbtype = msg.QueryItems["cbtype"];
+                        msg.QueryItems.TryGetValue("user_id", out string userid);
+                        msg.QueryItems.TryGetValue("user_name", out string username);
+                        msg.QueryItems.TryGetValue("cbtype", out string cbtype);
                         switch (cbtype)
                         {
                             case "stream":
-                                await ProcessStreamMessage(userid, msg.RequestBody);
+                                await ProcessUserEvent(userid);
                                 break;
                             default:
                                 _logger.LogWarning($"Unrecognized callback type '{cbtype}', cannot process.");
@@ -151,12 +142,11 @@ namespace Betty.Bot.Modules.Twitch
 
         private async Task VerifySubscriptions()
         {
-            // Get all existing subscriptions
-            var allsubs = new List<TwitchLib.Api.Helix.Models.Webhooks.Subscription>();
+            var allsubs = new List<TwitchLib.Api.Helix.Models.EventSub.EventSubSubscription>();
             string cursor = null;
             do
             {
-                var subsresp = await _twitch.Helix.Webhooks.GetWebhookSubscriptionsAsync(after: cursor, first: 100);
+                var subsresp = await _twitch.Helix.EventSub.GetEventSubSubscriptionsAsync(after: cursor);
                 allsubs.AddRange(subsresp.Subscriptions);
                 cursor = subsresp.Pagination.Cursor;
             } while (cursor != null);
@@ -170,32 +160,52 @@ namespace Betty.Bot.Modules.Twitch
             // Check if we have a subscription
             foreach (var streamer in substreamers)
             {
-                var topic = $"https://api.twitch.tv/helix/streams?user_id={streamer.Id}";
                 var callback = _config["TwitchCallbackUrl"] + $"&user_id={streamer.Id}&user_name={streamer.UserName}&cbtype=stream";
                 var signingsecret = _config["TwitchCallbackSigningSecret"];
-                var sub = allsubs.Where(s => s.Topic == topic).FirstOrDefault();
-                if (sub != null)
+                
+                // We need subscriptions on these types of events
+                var types = new[] { "stream.online", "stream.offline" };
+                foreach (var type in types)
                 {
-                    if (sub.Callback != callback)
+                    var existingSub = allsubs.Where(s => s.Type == type && s.Condition.Any(c => c.Key == "broadcaster_user_id" && c.Value == streamer.Id)).FirstOrDefault();
+                    if (existingSub != null)
                     {
-                        _logger.LogInformation($"We have a working subscription on {streamer.UserName}, but the callback URL is incorrect. Unsubscribing and resubscribing...");
-                        await _twitch.Helix.Webhooks.StreamUpDownAsync(sub.Callback, WebhookCallMode.Unsubscribe, streamer.Id, TimeSpan.FromSeconds(864000), signingSecret: signingsecret);
-                        await _twitch.Helix.Webhooks.StreamUpDownAsync(callback, WebhookCallMode.Subscribe, streamer.Id, TimeSpan.FromSeconds(864000), signingSecret: signingsecret);
-                    }
-                    else if (DateTime.UtcNow > sub.ExpiresAt.AddHours(-2))
-                    {
-                        _logger.LogInformation($"We have a working subscription on {streamer.UserName}, but it expires within 2 hours. Renewing...");
-                        await _twitch.Helix.Webhooks.StreamUpDownAsync(callback, WebhookCallMode.Subscribe, streamer.Id, TimeSpan.FromSeconds(864000), signingSecret: signingsecret);
+                        if (existingSub.Transport.Callback != callback)
+                        {
+                            _logger.LogInformation($"We have a working '{type}' subscription on {streamer.UserName}, but the callback URL is incorrect. Unsubscribing and resubscribing...");
+                            await _twitch.Helix.EventSub.DeleteEventSubSubscriptionAsync(existingSub.Id);
+                            await _twitch.Helix.EventSub.CreateEventSubSubscriptionAsync(
+                                type: type,
+                                version: "1",
+                                condition: new Dictionary<string, string>
+                                {
+                                    { "broadcaster_user_id", streamer.Id }
+                                },
+                                method: "webhook",
+                                callback: callback,
+                                secret: signingsecret
+                            );
+                        }
+                        else
+                        {
+                            _logger.LogDebug($"We have a working '{type}' subscription on {streamer.UserName} (and expiration is no longer a thing)");
+                        }
                     }
                     else
                     {
-                        _logger.LogDebug($"We have a working subscription on {streamer.UserName} and its expiration is far enough away ({sub.ExpiresAt})");
+                        _logger.LogInformation($"We currently have no '{type}' subscription for {streamer.UserName}. Subscribing...");
+                        await _twitch.Helix.EventSub.CreateEventSubSubscriptionAsync(
+                            type: type,
+                            version: "1",
+                            condition: new Dictionary<string, string>
+                            {
+                                { "broadcaster_user_id", streamer.Id }
+                            },
+                            method: "webhook",
+                            callback: callback,
+                            secret: signingsecret
+                        );
                     }
-                }
-                else
-                {
-                    _logger.LogInformation($"We currently have no subscription for {streamer.UserName}. Subscribing...");
-                    await _twitch.Helix.Webhooks.StreamUpDownAsync(callback, WebhookCallMode.Subscribe, streamer.Id, TimeSpan.FromSeconds(864000), signingSecret: signingsecret);
                 }
             }
         }
@@ -218,7 +228,7 @@ namespace Betty.Bot.Modules.Twitch
                 if (streamResp.Streams.Length == 0)
                 {
                     // Seems this streamer went offline?
-                    await ProcessStreamMessage(streamer.Id, JsonConvert.SerializeObject(streamResp));
+                    await ProcessUserEvent(streamer.Id);
                     continue;
                 }
                 var stream = streamResp.Streams.First();
@@ -329,7 +339,7 @@ namespace Betty.Bot.Modules.Twitch
             }
         }
 
-        private async Task ProcessStreamMessage(string userid, string body)
+        private async Task ProcessUserEvent(string userid)
         {
             // Get the user via API
             var userResp = await _twitch.Helix.Users.GetUsersAsync(ids: new List<string> { userid }).ConfigureAwait(true);
@@ -346,8 +356,8 @@ namespace Betty.Bot.Modules.Twitch
             state.OfflineImageUrl = user.OfflineImageUrl;
             state.ViewCount = user.ViewCount;
 
-            // Decide what to do depending on what we received and what our state is
-            var streams = JsonConvert.DeserializeObject<GetStreamsResponse>(body);
+            // Based on the trigger we just got, we'll fetch the current state of the streamer. Messages can be delayed. We always want to use the most recent info.
+            var streams = await _twitch.Helix.Streams.GetStreamsAsync(userIds: new List<string> { userid }, type: "live").ConfigureAwait(true);
             var stream = streams.Streams.FirstOrDefault();
             var correctedGameId = string.IsNullOrEmpty(stream?.GameId) ? FallbackGameId : stream.GameId; // We cannot handle empty "game_id"
             
@@ -565,7 +575,7 @@ namespace Betty.Bot.Modules.Twitch
             
             var embed = new EmbedBuilder()
             {
-                Title = stream.CurrentTitle.Length >= EmbedBuilder.MaxTitleLength ? stream.CurrentTitle.Substring(0, 255) : stream.CurrentTitle,
+                Title = stream.CurrentTitle.TrimToMax(EmbedBuilder.MaxTitleLength),
                 Author = new EmbedAuthorBuilder
                 {
                     Name = stream.DisplayName,
@@ -576,7 +586,7 @@ namespace Betty.Bot.Modules.Twitch
                 Color = online ? Color.Green : Color.Red,
                 ThumbnailUrl = Uri.IsWellFormedUriString(gameThumbnail, UriKind.Absolute) ? gameThumbnail : null,
                 ImageUrl = Uri.IsWellFormedUriString(streamThumbnail, UriKind.Absolute) ? streamThumbnail : null,
-                Description = description.ToString(),
+                Description = description.ToString().TrimToMax(EmbedBuilder.MaxDescriptionLength),
                 Footer = new EmbedFooterBuilder
                 {
                     Text = footerText
@@ -658,9 +668,9 @@ namespace Betty.Bot.Modules.Twitch
 
             // Check subscriptions if we added a streamer we didn't know yet
             if (isnew)
-            {
                 await VerifySubscriptions();
-            }
+
+            await ProcessUserEvent(user.Id);
 
             await ReplyAsync($"{prefix} Announcement for Twitch user {user.DisplayName} has been added for <#{channel.Id}>");
         }
