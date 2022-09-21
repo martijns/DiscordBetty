@@ -172,7 +172,7 @@ namespace Betty.Bot.Modules.Twitch
                     {
                         if (existingSub.Transport.Callback != callback)
                         {
-                            _logger.LogInformation($"We have a working '{type}' subscription on {streamer.UserName}, but the callback URL is incorrect. Unsubscribing and resubscribing...");
+                            _logger.LogInformation($"We have a working '{type}' subscription on {streamer.UserName}, but the callback URL is incorrect (got={existingSub.Transport.Callback} vs expected={callback}). Unsubscribing and resubscribing...");
                             await _twitch.Helix.EventSub.DeleteEventSubSubscriptionAsync(existingSub.Id);
                             await _twitch.Helix.EventSub.CreateEventSubSubscriptionAsync(
                                 type: type,
@@ -381,7 +381,7 @@ namespace Betty.Bot.Modules.Twitch
                 state.Games.Add(new GameEvent { EventTime = stream.StartedAt, SecondsSinceLive = 0, GameId = game.Id, GameName = game.Name });
 
                 // Get link to VOD
-                var video = await _twitch.Helix.Videos.GetVideoAsync(userId: state.Id, type: VideoType.Archive, first: 1);
+                var video = await _twitch.Helix.Videos.GetVideosAsync(userId: state.Id, type: VideoType.Archive, first: 1);
                 if (video.Videos.Length > 0 && DateTime.Parse(video.Videos.First().CreatedAt, CultureInfo.InvariantCulture) > DateTime.UtcNow.AddDays(-2))
                     state.LinkToVOD = $"https://www.twitch.tv/videos/{video.Videos.First().Id}";
 
@@ -427,7 +427,7 @@ namespace Betty.Bot.Modules.Twitch
                 state.CurrentGameBoxArtUrl = game.BoxArtUrl;
 
                 // Get link to VOD
-                var video = await _twitch.Helix.Videos.GetVideoAsync(userId: state.Id, type: VideoType.Archive, first: 1);
+                var video = await _twitch.Helix.Videos.GetVideosAsync(userId: state.Id, type: VideoType.Archive, first: 1);
                 if (video.Videos.Length > 0 && DateTime.Parse(video.Videos.First().CreatedAt, CultureInfo.InvariantCulture) > DateTime.UtcNow.AddDays(-2))
                     state.LinkToVOD = $"https://www.twitch.tv/videos/{video.Videos.First().Id}";
 
@@ -484,7 +484,7 @@ namespace Betty.Bot.Modules.Twitch
                 }
 
                 // Get link to VOD
-                var video = await _twitch.Helix.Videos.GetVideoAsync(userId: state.Id, type: VideoType.Archive, first: 1);
+                var video = await _twitch.Helix.Videos.GetVideosAsync(userId: state.Id, type: VideoType.Archive, first: 1);
                 if (video.Videos.Length > 0 && DateTime.Parse(video.Videos.First().CreatedAt, CultureInfo.InvariantCulture) > DateTime.UtcNow.AddDays(-2))
                     state.LinkToVOD = $"https://www.twitch.tv/videos/{video.Videos.First().Id}";
 
