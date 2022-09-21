@@ -1,12 +1,9 @@
 ﻿using Microsoft.Azure.Cosmos.Table;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection.Metadata;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Betty.Bot.Services

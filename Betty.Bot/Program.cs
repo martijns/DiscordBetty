@@ -30,6 +30,9 @@ namespace Betty.Bot
     {
         private static bool _InterruptRequested = false;
 
+        private FileSystemWatcher _fsw;
+        private PhysicalFilesWatcher _pfw;
+
         static void Main(string[] args)
         {
             new Program().MainAsync().GetAwaiter().GetResult();
@@ -59,8 +62,8 @@ namespace Betty.Bot
 
             // Setup filesystemwatcher
             var baseDir = AppContext.BaseDirectory;
-            var fsw = new FileSystemWatcher(baseDir, "*.*");
-            var pfw = new PhysicalFilesWatcher(baseDir, fsw, true);
+            _fsw = new FileSystemWatcher(baseDir, "*.*");
+            _pfw = new PhysicalFilesWatcher(baseDir, _fsw, true);
             Log.Information($"Watching {baseDir} for changes...");
             static async void handler(object src, FileSystemEventArgs args)
             {
@@ -72,11 +75,11 @@ namespace Betty.Bot
                     _InterruptRequested = true;
                 }
             }
-            fsw.Changed += handler;
-            fsw.Created += handler;
-            fsw.Deleted += handler;
-            fsw.IncludeSubdirectories = false;
-            fsw.EnableRaisingEvents = true;
+            _fsw.Changed += handler;
+            _fsw.Created += handler;
+            _fsw.Deleted += handler;
+            _fsw.IncludeSubdirectories = false;
+            _fsw.EnableRaisingEvents = true;
 
             // Setup services
             var serviceProvider = new ServiceCollection()

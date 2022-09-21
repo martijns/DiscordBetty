@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using Betty.Bot.Extensions;
 
 namespace Betty.Bot.Services
 {
@@ -36,7 +37,9 @@ namespace Betty.Bot.Services
         public Task OnReadyAsync()
         {
             _logger.LogInformation($"Connected as -> [{_discord.CurrentUser}] :)");
-            _logger.LogInformation($"We are on [{_discord.Guilds.Count}] servers");
+            _logger.LogInformation($"We are on [{_discord.Guilds.Count}] servers:");
+            foreach (var guild in _discord.Guilds)
+                _logger.LogInformation($" - {guild.Id}/{guild.Name} owned by {guild.Owner?.SummarizeName()} with permissions: {string.Join(",",guild.CurrentUser?.GuildPermissions.ToList())}");
             return Task.CompletedTask;
         }
 
