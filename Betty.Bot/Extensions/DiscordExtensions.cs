@@ -78,11 +78,11 @@ namespace Betty.Bot.Extensions
             return Task.FromResult(dict);
         }
 
-        public static Task<Dictionary<string,string>> SummarizeChanges(this SocketUser ubefore, SocketUser uafter)
+        public async static Task<Dictionary<string,string>> SummarizeChanges(this SocketUser ubefore, SocketUser uafter)
         {
             var dict = new Dictionary<string, string>();
 
-            if (ubefore.SummarizeName() != uafter.SummarizeName()) dict.Add("Name", $"{ubefore.SummarizeName()} => {uafter.SummarizeName()}");
+            if (await ubefore.SummarizeName() != await uafter.SummarizeName()) dict.Add("Name", $"{await ubefore.SummarizeName()} => {await uafter.SummarizeName()}");
             if (ubefore.GetAvatarUrl() != uafter.GetAvatarUrl()) dict.Add("Avatar", "has changed");
             if (ubefore.PublicFlags != uafter.PublicFlags) dict.Add("PublicFlags", $"{ubefore.PublicFlags} => {uafter.PublicFlags}");
 
@@ -94,7 +94,7 @@ namespace Betty.Bot.Extensions
                 if (gbefore.VoiceChannel != gafter.VoiceChannel) dict.Add("VoiceChannel", $"{gbefore.VoiceChannel?.Name} => {gafter.VoiceChannel?.Name}");
             }
 
-            return Task.FromResult(dict);
+            return dict;
         }
     }
 }

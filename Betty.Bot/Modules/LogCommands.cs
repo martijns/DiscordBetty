@@ -84,7 +84,7 @@ namespace Betty.Bot.Modules
                     await ReportActivity(gchannel.Guild, new EmbedBuilder()
                         .WithTitle("Message Deleted")
                         .WithDescription($"A message was deleted from channel `{gchannel.Name}`")
-                        .AddField("Author", message.Author.SummarizeName(), true)
+                        .AddField("Author", await message.Author.SummarizeName(), true)
                         .AddField("Content", message.Content.TrimToMax(EmbedBuilder.MaxDescriptionLength), true)
                         .AddField("CreationDate", message.CreatedAt, true)
                         .WithCurrentTimestamp()
@@ -126,7 +126,7 @@ namespace Betty.Bot.Modules
                         await ReportActivity(gchannel.Guild, new EmbedBuilder()
                             .WithTitle("Message Deleted (part of a bulk delete)")
                             .WithDescription($"A message was deleted from channel `{gchannel.Name}`")
-                            .AddField("Author", dmsg.Author.SummarizeName(), true)
+                            .AddField("Author", await dmsg.Author.SummarizeName(), true)
                             .AddField("Content", dmsg.Content.TrimToMax(EmbedBuilder.MaxDescriptionLength), true)
                             .AddField("CreationDate", dmsg.CreatedAt, true)
                             .WithCurrentTimestamp()
@@ -190,7 +190,7 @@ namespace Betty.Bot.Modules
             {
                 await ReportActivity(guilduser.Guild, new EmbedBuilder()
                     .WithTitle("User Joined")
-                    .AddField("Name", guilduser.SummarizeName(), true)
+                    .AddField("Name", await guilduser.SummarizeName(), true)
                     .AddField("CreatedAt", guilduser.CreatedAt, true)
                     .AddField("IsBot", guilduser.IsBot, true)
                     .AddField("PremiumSince", guilduser.PremiumSince, true)
@@ -203,7 +203,7 @@ namespace Betty.Bot.Modules
             {
                 await ReportActivity(guilduser.Guild, new EmbedBuilder()
                     .WithTitle("User Left")
-                    .AddField("Name", guilduser.SummarizeName(), true)
+                    .AddField("Name", await guilduser.SummarizeName(), true)
                     .AddField("CreatedAt", guilduser.CreatedAt, true)
                     .AddField("IsBot", guilduser.IsBot, true)
                     .AddField("PremiumSince", guilduser.PremiumSince, true)
@@ -216,7 +216,7 @@ namespace Betty.Bot.Modules
             {
                 await ReportActivity(guild, new EmbedBuilder()
                     .WithTitle("User Left")
-                    .AddField("Name", user.SummarizeName(), true)
+                    .AddField("Name", await user.SummarizeName(), true)
                     .AddField("CreatedAt", user.CreatedAt, true)
                     .AddField("IsBot", user.IsBot, true)
                     .AddField("PublicFlags", user.PublicFlags, true)
@@ -228,7 +228,7 @@ namespace Betty.Bot.Modules
             {
                 await ReportActivity(guild, new EmbedBuilder()
                     .WithTitle("User Left")
-                    .AddField("Name", user.SummarizeName(), true)
+                    .AddField("Name", await user.SummarizeName(), true)
                     .AddField("CreatedAt", user.CreatedAt, true)
                     .AddField("IsBot", user.IsBot, true)
                     .AddField("PublicFlags", user.PublicFlags, true)
@@ -244,7 +244,7 @@ namespace Betty.Bot.Modules
 
                 await ReportActivity(gbefore.Guild, new EmbedBuilder()
                     .WithTitle("User Updated")
-                    .WithDescription($"User {gafter.SummarizeName()} was updated")
+                    .WithDescription($"User {await gafter.SummarizeName()} was updated")
                     .WithFields((await gbefore.SummarizeChanges(gafter)).Select(c => new EmbedFieldBuilder { Name = c.Key, Value = c.Value, IsInline = true }).ToArray())
                     .WithCurrentTimestamp()
                     .Build());
@@ -253,7 +253,7 @@ namespace Betty.Bot.Modules
             {
                 await ReportActivity(before.Guild, new EmbedBuilder()
                     .WithTitle("User Updated")
-                    .WithDescription($"User {after.SummarizeName()} was updated")
+                    .WithDescription($"User {await after.SummarizeName()} was updated")
                     .WithFields((await before.SummarizeChanges(after)).Select(c => new EmbedFieldBuilder { Name = c.Key, Value = c.Value, IsInline = true }).ToArray())
                     .WithCurrentTimestamp()
                     .Build());
@@ -286,11 +286,11 @@ namespace Betty.Bot.Modules
             {
                 await ReportActivity(invite.Guild, new EmbedBuilder()
                     .WithTitle("Invite Created")
-                    .AddField("Inviter", invite.Inviter?.SummarizeName(), true)
+                    .AddField("Inviter", invite.Inviter != null ? await invite.Inviter.SummarizeName() : string.Empty, true)
                     .AddField("MaxAge", invite.MaxAge, true)
                     .AddField("MaxUses", invite.MaxUses, true)
                     .AddField("IsTemporary", invite.IsTemporary, true)
-                    .AddField("TargetUser", invite.TargetUser?.SummarizeName(), true)
+                    .AddField("TargetUser", invite.TargetUser != null ? await invite.TargetUser.SummarizeName() : string.Empty, true)
                     .AddField("URL", invite.Url, true)
                     .WithCurrentTimestamp()
                     .Build());

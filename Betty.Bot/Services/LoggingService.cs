@@ -34,13 +34,15 @@ namespace Betty.Bot.Services
         }
 
         // this method executes on the bot being connected/ready
-        public Task OnReadyAsync()
+        public async Task OnReadyAsync()
         {
             _logger.LogInformation($"Connected as -> [{_discord.CurrentUser}] :)");
             _logger.LogInformation($"We are on [{_discord.Guilds.Count}] servers:");
             foreach (var guild in _discord.Guilds)
-                _logger.LogInformation($" - {guild.Id}/{guild.Name} owned by {guild.Owner?.SummarizeName()} with permissions: {string.Join(",",guild.CurrentUser?.GuildPermissions.ToList())}");
-            return Task.CompletedTask;
+            {
+                var owner = guild.Owner != null ? await guild.Owner.SummarizeName() : string.Empty;
+                _logger.LogInformation($" - {guild.Id}/{guild.Name} owned by {owner} with permissions: {string.Join(",", guild.CurrentUser?.GuildPermissions.ToList())}");
+            }
         }
 
         // this method switches out the severity level from Discord.Net's API, and logs appropriately
