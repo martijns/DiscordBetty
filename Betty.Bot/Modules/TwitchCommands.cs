@@ -20,6 +20,7 @@ using System.Text;
 using System.Threading.Tasks;
 using TwitchLib.Api;
 using TwitchLib.Api.Core.Enums;
+using TwitchLib.Api.Helix.Models.Games;
 
 namespace Betty.Bot.Modules.Twitch
 {
@@ -245,6 +246,11 @@ namespace Betty.Bot.Modules.Twitch
                     Title = stream.Title,
                     ViewerCount = stream.ViewerCount
                 });
+
+                // Update some fields while we're at it
+                streamer.CurrentTitle = stream.Title;
+                streamer.CurrentGameName = stream.GameName;
+                streamer.ViewCount = stream.ViewerCount;
 
                 // If we have too many snapshots, clear from the start. If we don't do this, we'll reach the 64kb limited storage in the KeyValueStore (when using azure storage).
                 while (streamer.Snapshots.Count > MaxSnapshots)
