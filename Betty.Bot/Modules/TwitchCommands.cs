@@ -182,9 +182,9 @@ namespace Betty.Bot.Modules.Twitch
                                 {
                                     { "broadcaster_user_id", streamer.Id }
                                 },
-                                method: "webhook",
-                                callback: callback,
-                                secret: signingsecret
+                                method: EventSubTransportMethod.Webhook,
+                                webhookCallback: callback,
+                                webhookSecret: signingsecret
                             );
                         }
                         else
@@ -202,9 +202,9 @@ namespace Betty.Bot.Modules.Twitch
                             {
                                 { "broadcaster_user_id", streamer.Id }
                             },
-                            method: "webhook",
-                            callback: callback,
-                            secret: signingsecret
+                            method: EventSubTransportMethod.Webhook,
+                            webhookCallback: callback,
+                            webhookSecret: signingsecret
                         );
                     }
                 }
@@ -363,7 +363,7 @@ namespace Betty.Bot.Modules.Twitch
             state.ViewCount = user.ViewCount;
 
             // Based on the trigger we just got, we'll fetch the current state of the streamer. Messages can be delayed. We always want to use the most recent info.
-            var streams = await _twitch.Helix.Streams.GetStreamsAsync(userIds: new List<string> { userid }, type: "live").ConfigureAwait(true);
+            var streams = await _twitch.Helix.Streams.GetStreamsAsync(userIds: new List<string> { userid }).ConfigureAwait(true);
             var stream = streams.Streams.FirstOrDefault();
             var correctedGameId = string.IsNullOrEmpty(stream?.GameId) ? FallbackGameId : stream.GameId; // We cannot handle empty "game_id"
             

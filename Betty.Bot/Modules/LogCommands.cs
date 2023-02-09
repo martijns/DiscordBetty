@@ -70,8 +70,10 @@ namespace Betty.Bot.Modules
             {
                 return Task.CompletedTask;
             };
-            _discord.MessageDeleted += async (msg, channel) =>
+            _discord.MessageDeleted += async (msg, cchannel) =>
             {
+                var channel = await cchannel.GetOrDownloadAsync();
+
                 var message = await msg.GetOrDownloadAsync();
                 if (message == null)
                     return;
@@ -110,8 +112,9 @@ namespace Betty.Bot.Modules
                         .Build());
                 }
             };
-            _discord.MessagesBulkDeleted += async (messages, channel) =>
+            _discord.MessagesBulkDeleted += async (messages, cchannel) =>
             {
+                var channel = await cchannel.GetOrDownloadAsync();
                 foreach (var msg in messages)
                 {
                     var dmsg = await msg.GetOrDownloadAsync();
@@ -199,16 +202,15 @@ namespace Betty.Bot.Modules
                     .WithCurrentTimestamp()
                     .Build());
             };
-            _discord.UserLeft += async (guilduser) =>
+            _discord.UserLeft += async (guild, user) =>
             {
-                await ReportActivity(guilduser.Guild, new EmbedBuilder()
+                await ReportActivity(guild, new EmbedBuilder()
                     .WithTitle("User Left")
-                    .AddField("Name", await guilduser.SummarizeName(), true)
-                    .AddField("CreatedAt", guilduser.CreatedAt, true)
-                    .AddField("IsBot", guilduser.IsBot, true)
-                    .AddField("PremiumSince", guilduser.PremiumSince, true)
-                    .AddField("PublicFlags", guilduser.PublicFlags, true)
-                    .WithThumbnailUrl(guilduser.GetAvatarUrl())
+                    .AddField("Name", await user.SummarizeName(), true)
+                    .AddField("CreatedAt", user.CreatedAt, true)
+                    .AddField("IsBot", user.IsBot, true)
+                    .AddField("PublicFlags", user.PublicFlags, true)
+                    .WithThumbnailUrl(user.GetAvatarUrl())
                     .WithCurrentTimestamp()
                     .Build());
             };
@@ -249,8 +251,9 @@ namespace Betty.Bot.Modules
                     .WithCurrentTimestamp()
                     .Build());
             };
-            _discord.GuildMemberUpdated += async (before, after) =>
+            _discord.GuildMemberUpdated += async (cbefore, after) =>
             {
+                var before = await cbefore.GetOrDownloadAsync();
                 await ReportActivity(before.Guild, new EmbedBuilder()
                     .WithTitle("User Updated")
                     .WithDescription($"User {await after.SummarizeName()} was updated")

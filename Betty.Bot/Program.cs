@@ -53,7 +53,7 @@ namespace Betty.Bot
                 {
                     o.MinimumBreadcrumbLevel = Serilog.Events.LogEventLevel.Debug;
                     o.MinimumEventLevel = Serilog.Events.LogEventLevel.Warning;
-                    o.Dsn = new Dsn(config["SentryDSN"]);
+                    o.Dsn = config["SentryDSN"];
                     o.InitializeSdk = true;
                 })
                 .WriteTo.File("logs/betty.log", rollingInterval: RollingInterval.Day, outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
@@ -84,7 +84,13 @@ namespace Betty.Bot
             // Setup services
             var serviceProvider = new ServiceCollection()
                 .AddSingleton<IConfiguration>(config)
-                .AddSingleton<DiscordSocketClient>()
+                .AddSingleton<DiscordSocketClient>((sp) => {
+                    var config = new DiscordSocketConfig
+                    {
+                        GatewayIntents = GatewayIntents.AllUnprivileged | GatewayIntents.GuildMembers | GatewayIntents.MessageContent
+                    };
+                    return new DiscordSocketClient(config);
+                })
                 .AddSingleton<CommandService>()
                 .AddSingleton<CommandHandler>()
                 .AddSingleton<LoggingService>()
