@@ -55,9 +55,9 @@ namespace Betty.Bot.Extensions
             if (user is SocketGuildUser guser &&
                 guser.Nickname != null)
             {
-                return Task.FromResult($"{guser.Username}{guser.Discriminator} ({guser.Nickname})");
+                return Task.FromResult($"{guser.Username}#{guser.Discriminator} ({guser.Nickname})");
             }
-            return Task.FromResult($"{user.Username}{user.Discriminator}");
+            return Task.FromResult($"{user.Username}#{user.Discriminator}");
         }
 
         public static Task<Dictionary<string,string>> SummarizeChanges(this IMessage mbefore, IMessage mafter)
