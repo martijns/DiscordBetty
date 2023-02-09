@@ -40,6 +40,7 @@ namespace Betty.Bot.Services
             _logger.LogInformation($"We are on [{_discord.Guilds.Count}] servers:");
             foreach (var guild in _discord.Guilds)
             {
+                await guild.DownloadUsersAsync();
                 var owner = guild.Owner != null ? await guild.Owner.SummarizeName() : string.Empty;
                 _logger.LogInformation($" - {guild.Id}/{guild.Name} owned by {owner} with permissions: {string.Join(",", guild.CurrentUser?.GuildPermissions.ToList())}");
             }
